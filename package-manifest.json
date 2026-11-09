@@ -1,0 +1,60 @@
+{
+  "source_commit": "a66622f9f63e9d2f4cd038e6852db4f320cf2959",
+  "version": "0.15.2-live-weight-readings",
+  "snapshot_counts": {
+    "visits": 90,
+    "photos": 17,
+    "groups": 3
+  },
+  "platform": "Windows x64",
+  "independent_data_snapshot": true,
+  "packaged_date": "2026-10-29",
+  "validation": {
+    "version": "0.15.1-manual-calibration",
+    "date": "2026-11-01",
+    "tests": {
+      "weight_core": "passed manual ZERO/MASS/TARE with vision gating false; noisy and saturated input still rejected; monitoring gate retained",
+      "weight_dashboard": "passed bird/missing-vision calibration controls and old firmware handling",
+      "weight_bridge": "passed"
+    },
+    "firmware": {
+      "compiled": true,
+      "uploaded": false,
+      "sha256": "e444dc65dc8bfdaa82279100e08851a7edc06f16284bd03f03cacbd473865a92"
+    },
+    "hardware_verification": "pending firmware upload and user calibration"
+  },
+  "firmware_sha256": {
+    "flash_ntz.bin": "21ecd60d2d36f800435dd058553415caf559bcacbb49c62e1de16e4b758361b1",
+    "nn_model.bin": "89b21762d4f853e8aef9fdbd7b6490ba2f531dc4b6b1147b181342a874d9ad48"
+  },
+  "previous_source_commit": "f77c0f2cf951f05e47303536c0e89f35488beb48",
+  "updated_utc": "20261030T092130Z",
+  "firmware_upload_required": false,
+  "update_preserved_user_files": 150,
+  "last_local_board_upload": {
+    "date": "2026-11-09",
+    "source_version": "0.15.2-live-weight-readings",
+    "port": "COM3",
+    "upload_success": true,
+    "tool_result": "upload success",
+    "source_commit": "a66622f9f63e9d2f4cd038e6852db4f320cf2959",
+    "firmware_sha256": {
+      "flash_ntz.bin": "21ecd60d2d36f800435dd058553415caf559bcacbb49c62e1de16e4b758361b1",
+      "nn_model.bin": "89b21762d4f853e8aef9fdbd7b6490ba2f531dc4b6b1147b181342a874d9ad48"
+    },
+    "post_reset_verification": "pending"
+  },
+  "ui_validation": {
+    "version": "0.15.2-live-weight-readings",
+    "date": "2026-11-01",
+    "tests": [
+      "weight dashboard: raw before calibration, live calibration delta, duplicate suppression, independent signed channels, 60-point cap, reset and stale clearing",
+      "visual dashboard regression passed"
+    ],
+    "firmware_changed": false,
+    "required_firmware_for_independent_calibration": "0.15.1",
+    "raw_units": "ADC counts, not grams"
+  },
+  "bundled_firmware_version": "0.15.1-manual-calibration"
+}

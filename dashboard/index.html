@@ -1,0 +1,51 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>即時監控</title><link rel="stylesheet" href="/style.css"></head><body><main class="shell">
+<nav class="main-nav" aria-label="主要導覽"><a href="/" aria-current="page">即時監控</a><a href="/history/" target="_blank" rel="noopener">到訪紀錄</a><a href="/history/groups" target="_blank" rel="noopener">群組相簿</a></nav>
+<header><h1>即時監控</h1><div id="connection" class="pill offline">等待連線</div></header><section class="grid">      <article class="camera-card">
+        <div class="camera-head"><strong>AMB82 即時攝影機</strong><span id="modeLabel">USB UVC / MJPEG</span></div>
+        <div id="camera" class="camera live-camera">
+          <video id="liveVideo" autoplay playsinline muted></video>
+          <div id="trackOverlays"></div><div id="bboxOverlay" class="bbox-overlay"><span id="bboxLabel">bird</span></div>
+          <div class="camera-empty" id="cameraEmpty">按下按鈕啟動 USB UVC 即時畫面</div>
+          <div class="timestamp" id="timestamp"></div>
+        </div>
+        <div class="camera-actions">
+          <button class="primary" id="startCamera">啟動 USB 攝影機</button>
+          <button class="secondary" id="stopCamera" disabled>暫停畫面</button>
+          <code id="cameraStatus">尚未啟動攝影機</code>
+        </div>
+      </article>
+<div class="monitor-sidebar" aria-label="辨識資訊與操作">
+<section class="panel vision-panel"><div class="panel-head"><h3>目前動態</h3></div>      <div class="vision-stats"><div>即時鳥數 <b id="liveBirds">—</b></div><div>本次開機到訪 <b id="totalVisits">—</b></div><div><span id="dailyVisitsLabel">今日新到訪</span> <b id="dailyVisits">—</b></div><div>待分群 <b id="unassigned">—</b></div></div>
+<p id="photoStatus" class="camera-note hint" role="status">開啟攝影機後自動保存代表照。</p></section>
+<section class="panel compact"><h3>雙秤重量監控</h3><p id="weightConnection" class="hint">等待重量資料</p><div id="weightCards"></div><p class="hint">僅監控重量，無投料或水泵控制。鳥類在畫面內時，兩秤都暫停更新穩定值。歸零必須空容器；鳥離開後請用「重新量測」。</p></section>
+<details class="panel compact"><summary>偵測設定</summary>        <section class="panel threshold-panel"><div class="panel-head"><h3>偵測門檻設定</h3></div>
+        <div class="camera-actions confidence-control">
+          <label for="bboxConfidence">鳥類偵測最低信心分數：<output id="bboxConfidenceValue" for="bboxConfidence">20%</output></label>
+          <input id="bboxConfidence" type="range" min="20" max="100" step="1" value="20"><button id="applyConfidence" type="button">套用至開發板</button><span id="confidenceStatus" role="status">等待板端門檻</span>
+        </div>
+
+
+</section>
+</details>
+<section class="panel compact"><h3>分群合併門檻</h3>
+<label for="groupSimilarity">外觀相似度達到 <output id="groupSimilarityValue">76%</output> 才合併</label>
+<div class="camera-actions"><input id="groupSimilarity" type="range" min="0" max="100" step="1" value="76"><button id="applySimilarity" type="button" disabled>套用分群門檻</button></div>
+<p id="similarityStatus" role="status">等待板端門檻</p><p class="hint">未達門檻會建立新群；群組已滿則保留未分群。分數是外觀相似度，不是鳥種辨識機率。設定只影響後續分群，重啟開發板後回到 76%。</p>
+<div id="unassignedScores"></div></section>
+<details class="panel compact"><summary>即時外觀群</summary><p id="groupActionStatus" role="status"></p><div id="groupGallery" class="group-gallery"></div><a href="/history/groups" target="_blank" rel="noopener">開啟群組相簿 →</a></details>
+<details class="panel compact"><summary>辨識詳細資訊</summary>      <aside class="status-card">
+        <div class="status-title"><span id="birdDot" class="dot"></span><div><small>辨識狀態</small><h2 id="birdState">尚未偵測到鳥</h2></div></div>
+        <dl>
+          <div><dt>靠近程度</dt><dd id="proximity">—</dd></div>
+          <div><dt>信心分數</dt><dd id="score">—</dd></div>
+          <div><dt>畫面占比</dt><dd id="area">—</dd></div>
+          <div><dt>原始結果數</dt><dd id="nnCount">0</dd></div>
+          <div><dt>BBox (x1,y1 → x2,y2)</dt><dd id="bbox" class="bbox-value">—</dd></div>
+          <div><dt>來訪編號</dt><dd id="visit">—</dd></div>
+
+        </dl>
+      </aside>
+</details>
+<details class="panel compact diagnostics"><summary>連線詳細資訊</summary><p id="visionHealth"></p><p id="visionWindow"></p><div id="trackList"></div>      <article class="panel log-panel"><div class="panel-head"><h3>事件紀錄</h3><span id="lastSeen">尚無紀錄</span></div><ol id="logs"></ol></article>
+</details>
+</div></section></main><script src="/vision.js"></script><script src="/weights.js"></script><script src="/app.js"></script><script src="/visit-photos.js"></script><script src="/navigation.js"></script></body></html>

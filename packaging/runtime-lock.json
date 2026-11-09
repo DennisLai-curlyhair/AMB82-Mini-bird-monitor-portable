@@ -1,0 +1,12 @@
+{
+  "python": {
+    "version": "3.14.10",
+    "url": "https://www.python.org/ftp/python/3.14.10/python-3.14.10-embed-amd64.zip",
+    "sha256": "90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159"
+  },
+  "pillow": {
+    "version": "12.3.0",
+    "url": "https://files.pythonhosted.org/packages/f1/e0/492879f69d94f91f60fc8cd05ba03650e9520afebb2fb7aa12777d7c7f38/pillow-12.3.0-cp314-cp314-win_amd64.whl",
+    "sha256": "fdafc9cce40277e0f7a0feabce0ee50dd2fa1800f3b38015e51296b5e814048d"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-30",
+  "version": "0.15.0-robust-weight",
+  "tests_passed": 21,
+  "relocated_chinese_space_path": true,
+  "offline_http_and_history": true,
+  "duplicate_start_blocked": true,
+  "stop_released_ports": [
+    8180,
+    8182
+  ],
+  "database_integrity": "ok",
+  "firmware_reflash_performed": false,
+  "hardware_live_video_retested": false,
+  "protected_user_files_unchanged": 150
+}

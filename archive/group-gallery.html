@@ -1,0 +1,117 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>鳥類群組相簿</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#091710;color:#e5f2e9;font:16px system-ui,sans-serif}main{max-width:1600px;margin:auto;padding:24px}a{color:#8cf0bc}h1{margin:0}p{line-height:1.6}.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.panel{padding:16px;background:#12271c;border:1px solid #365940;border-radius:12px;margin:16px 0}input,select,button{font:inherit;padding:9px;border-radius:6px;border:1px solid #52765e;background:#193826;color:inherit}button{cursor:pointer}button:disabled{opacity:.4;cursor:default}label{display:inline-flex;align-items:center;gap:6px}.hint,small{color:#accab7}#message{color:#ffe39c;min-height:24px}.layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px}.groups{max-height:75vh;overflow:auto;align-self:start;position:sticky;top:12px}.group{display:block;width:100%;text-align:left;margin-bottom:12px;padding:12px}.group.active{border:2px solid #8cf0bc;background:#254d35}.group img{width:100%;height:140px;object-fit:contain;background:#061109}.group b,.group small{display:block;margin-top:6px;overflow-wrap:anywhere}.photos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}.visit{padding:16px;background:#12271c;border:1px solid #365940;border-radius:12px}.visit img{width:100%;height:300px;object-fit:contain;background:#061109}.visit p{overflow-wrap:anywhere}.excluded{opacity:.6}.missing{height:300px;display:grid;place-items:center;background:#061109}.tools{margin-top:0}#empty{padding:32px}dialog{max-width:94vw;max-height:94vh;background:#12271c;color:inherit;border:1px solid #8cf0bc;border-radius:12px}dialog::backdrop{background:#000c}dialog img{display:block;max-width:86vw;max-height:75vh;object-fit:contain}dialog .row{justify-content:space-between}#groupTitle{overflow-wrap:anywhere}@media(max-width:800px){main{padding:12px}.layout{grid-template-columns:1fr}.groups{position:static;max-height:300px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.group img{height:100px}.visit img{height:260px}}
+[hidden]{display:none!important}.main-nav{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}.main-nav a{text-decoration:none;color:#b9cebf;padding:10px 16px;border-radius:9px}.main-nav a[aria-current]{background:#234532;color:#a0ffd0}.organize{margin-left:auto}.organize summary{cursor:pointer;color:#accab7}.tools{position:sticky;top:8px;z-index:3;box-shadow:0 5px 18px #0008}.layout{grid-template-columns:240px minmax(0,1fr)}.group img{height:100px}.photos{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}.visit img{height:340px}.visit label{margin-bottom:12px}.photo-open{height:340px;display:grid;place-items:center;background:#061109}.visit img.thumbnail{width:128px;height:128px;object-fit:contain}.visit button{margin-top:10px}#empty:empty,#message:empty{display:none}@media(max-width:800px){.layout{grid-template-columns:1fr}.tools{position:static}.visit img{height:300px}.photo-open{height:300px}.visit img.thumbnail{height:128px}}
+</style><main>
+<nav class="main-nav" aria-label="主要導覽"><a href="/" target="_blank" rel="noopener">即時監控</a><a href="/history/">到訪紀錄</a><a href="/history/groups" aria-current="page">群組相簿</a></nav><header><h1>群組相簿</h1></header>
+<p class="hint">先選日期，再查看當天的群組與照片。勾選照片可調整分群。</p>
+<section class="panel row"><label>到訪日期 <select id="date" aria-label="到訪日期"></select></label><input id="window" type="checkbox" hidden><input id="excluded" type="checkbox" hidden><button id="reload">重新載入</button><span id="summary"></span></section>
+<div class="row"><div id="message" role="status" aria-live="polite"></div><details class="organize"><summary>整理選項</summary><button id="undo">撤銷最近一次整理</button></details></div>
+<div class="layout"><nav id="groups" class="groups" aria-label="外觀群組"></nav><section>
+<h2 id="groupTitle">選擇左側群組</h2>
+<section class="panel tools" id="selectionTools" hidden><div class="row"><label><input id="all" type="checkbox">選取本頁</label><b id="selected">已選 0 筆</b><select id="target" aria-label="目標群組"><option value="">選擇移入的群組</option></select><input id="name" maxlength="80" placeholder="或建立新群組名稱"><button id="move">移入群組</button></div>
+<div class="row" style="margin-top:12px"><button id="restore">恢復原始自動分群</button><button id="cancel">取消選取</button></div>
+<p class="hint">只移動選取的照片，原始分群紀錄仍保留。</p></section>
+<div class="row"><button id="prev">上一頁</button><span id="page"></span><button id="next">下一頁</button></div>
+<p id="empty"></p><div id="photos" class="photos"></div>
+</section></div>
+<dialog id="viewer"><div class="row"><p id="viewTitle"></p><button id="closeViewer">關閉大圖</button></div><img id="viewImage" alt="到訪影像大圖"><p><a id="original" target="_blank" rel="noopener">另開原始圖片</a></p></dialog>
+</main><script>
+const $=id=>document.getElementById(id),selected=new Set();let current='',offset=0,rows=[],total=0,busy=false,requestId=0;
+const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const part=k=>parts.find(p=>p.type===k).value;$('date').value=part('year')+'-'+part('month')+'-'+part('day');
+const initial=new URLSearchParams(location.search);current=initial.get('group')||'';
+async function initialize(){try{const response=await fetch('/history/api/group-gallery?date=all&limit=1');const data=await response.json();if(!response.ok)throw Error(data.error||'日期讀取失敗');
+ const today=part('year')+'-'+part('month')+'-'+part('day');const dates=data.dates?.length?data.dates:[{date:today,visits:0}];
+ $('date').replaceChildren(...dates.map(d=>new Option(d.date+' · '+d.visits+' 次到訪',d.date)));
+ const requested=initial.get('date');if(dates.some(d=>d.date===requested))$('date').value=requested;else $('date').value=dates[0].date;
+ await load();}catch(e){$('message').textContent=e.message;}}
+function displayName(name){return name.replace(/ · 批次 .+$/,'');}
+function text(tag,value){const e=document.createElement(tag);e.textContent=value;return e;}
+function query(){return new URLSearchParams({date:$('date').value,window:$('window').checked?'1':'0',excluded:$('excluded').checked?'1':'0',group:current,offset,limit:48});}
+function selection(){$('selectionTools').hidden=!selected.size;$('selected').textContent='已選 '+selected.size+' 筆';$('all').checked=rows.length>0&&rows.every(r=>selected.has(r.key));$('move').disabled=$('restore').disabled=busy||!selected.size;}
+function view(r,name){$('viewTitle').textContent='#'+r.track+' · '+r.local_time.replace('T',' ').slice(0,19)+(r.photo?' · 近似配對':' · 僅有縮圖');$('viewImage').src='/history/images/'+name;$('original').href=$('viewImage').src;$('viewer').showModal();}
+function photoButton(r,name,label){const b=text('button',label);b.onclick=()=>view(r,name);return b;}
+
+function groupingSummary(g){
+ if(!g)return '分群分數：舊紀錄未提供';
+ if(g.score==null){
+  if(g.decision===1)return '首次建立外觀群，無既有群可比對';
+  if(!g.eligible)return '尚未比對：未校時或跨日持續到訪';
+  return '尚未比對：有效樣本 '+g.samples+'/5（樣本不足或無可用影像）';
+ }
+ const gap=g.threshold-g.score;
+ return (g.decision===2?'合併前比對群 ':'當時最接近外觀群 ')+g.candidate+'：'+g.score.toFixed(2)+'% · 當時門檻 '+g.threshold+'% · '+
+  (gap>0?'低於門檻 '+gap.toFixed(2)+' 個百分點':'已達門檻')+
+  (g.decision===1?' · 未合併，建立新群':g.decision===3?' · 群組容量已滿':'');
+}
+
+function deleteVisitButton(r){
+ const button=text('button','刪除這次到訪');button.className='delete-visit';button.type='button';
+ button.onclick=async()=>{
+  if(!confirm('刪除到訪 #'+r.track+'？照片、到訪紀錄及群組關聯將一併移除，次數會重新計算。此操作無法撤銷。'))return;
+  if(busy)return;busy=true;button.disabled=true;
+  try{
+   const response=await fetch('/history/api/delete-visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:r.key})});
+   const data=await response.json();if(!response.ok)throw Error(data.error||'刪除失敗');
+   if($('viewer').open)$('viewer').close();
+   try{localStorage.setItem('bird-archive-change',String(Date.now()));}catch(_){}
+   selected.delete(r.key);
+   await load();$('message').textContent='已刪除這次到訪，紀錄及群組次數已更新';
+  }catch(e){$('message').textContent='刪除失敗：'+e.message;button.disabled=false;}finally{busy=false;selection();$('prev').disabled=offset===0;$('next').disabled=offset+48>=total;}
+ };return button;
+}
+
+async function load(){
+ const serial=++requestId;
+ try{
+  const response=await fetch('/history/api/group-gallery?'+query());const d=await response.json();if(!response.ok)throw Error(d.error||'讀取失敗');if(serial!==requestId)return;
+  const chosen=$('date').value,dates=d.dates?.length?d.dates:[{date:chosen,visits:0}];
+  $('date').replaceChildren(...dates.map(day=>new Option(day.date+' · '+day.visits+' 次到訪',day.date)));
+  if(dates.some(day=>day.date===chosen))$('date').value=chosen;
+  else{current='';offset=0;selected.clear();return load();}
+  if(!d.groups.some(g=>g.id===current)&&d.groups.length){current=d.groups[0].id;offset=0;selected.clear();return load();}
+  if(!d.groups.length)current='';
+  if(offset>0&&offset>=d.total){offset=d.total?Math.floor((d.total-1)/48)*48:0;return load();}
+  rows=d.visits;total=d.total;const group=d.groups.find(g=>g.id===current);
+  $('summary').textContent=d.groups.length+' 群 · '+d.total_visits+' 次到訪';$('groupTitle').textContent=group?displayName(group.name)+'（'+group.count+' 次）':current?'此群目前沒有符合篩選的到訪':'尚無群組';
+  $('groups').replaceChildren(...d.groups.map(g=>{const b=document.createElement('button');b.className='group'+(g.id===current?' active':'');b.setAttribute('aria-pressed',g.id===current?'true':'false');
+   if(g.preview){const im=document.createElement('img');im.src='/history/images/'+g.preview;im.alt=g.name+'代表圖';im.loading='lazy';b.append(im);}
+   b.title=g.name;b.append(text('b',displayName(g.name)),text('small',g.count+' 次到訪 · '+g.photo_count+' 筆大圖'),text('small',g.first.slice(0,16).replace('T',' ')+' ～ '+g.last.slice(0,16).replace('T',' ')));
+   b.onclick=()=>{if(busy)return;current=g.id;offset=0;selected.clear();load();};return b;
+  }));
+  const old=$('target').value;$('target').replaceChildren(new Option('選擇移入的群組',''));for(const g of d.targets)if(g.id!==current)$('target').add(new Option(g.name,g.id));if([...$('target').options].some(o=>o.value===old))$('target').value=old;
+  $('photos').replaceChildren(...rows.map(r=>{const card=document.createElement('article');card.className='visit'+(r.excluded?' excluded':'');const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=selected.has(r.key);check.onchange=()=>{check.checked?selected.add(r.key):selected.delete(r.key);selection();};label.append(check,text('b','#'+r.track+' · '+r.local_time.replace('T',' ').slice(0,19)));card.append(label);
+   const name=r.photo?.crop_image||r.image;
+   if(name){const link=document.createElement('a');link.href='/history/images/'+name;link.onclick=e=>{e.preventDefault();view(r,name);};const im=document.createElement('img');im.src=link.href;im.alt='到訪 #'+r.track+' 代表照';im.loading='lazy';if(!r.photo)im.className='thumbnail';link.className='photo-open';link.append(im);card.append(link);}else{const missing=text('div','沒有可用照片');missing.className='missing';card.append(missing);}
+   if(r.photo){card.append(photoButton(r,r.photo.full_image,'查看完整畫面'));}
+   else card.append(text('p',r.photo_deleted?'照片已刪除':r.image?'僅有板端縮圖；未取得大圖':'尚無照片'));
+   card.append(text('p',groupingSummary(r.grouping)));card.append(deleteVisitButton(r));
+
+   if(r.time_uncertain)card.append(text('small','時間待確認'));return card;
+  }));
+  $('empty').textContent=rows.length?'':'此群沒有符合條件的到訪；可選另一群或調整篩選。';$('page').textContent=(total?offset+1:0)+'–'+Math.min(offset+48,total)+' / '+total;$('prev').disabled=busy||offset===0;$('next').disabled=busy||offset+48>=total;selection();
+ }catch(e){if(serial===requestId)$('message').textContent=e.message;}
+}
+async function change(kind){
+ if(busy)return;const target=$('target').value,name=$('name').value.trim();
+ if(kind==='move'&&!target&&!name){$('message').textContent='請選擇目標群組或輸入新群組名稱';return;}
+ if(kind!=='undo'&&!selected.size)return;
+ if(kind==='undo'&&!confirm('撤銷最近一次人工整理？此操作也可能來自逐次到訪頁。'))return;
+ const payload=kind==='undo'?{action:'undo'}:{action:'assign',keys:[...selected],group:kind==='restore'?null:(target.startsWith('manual:')?target.slice(7):target||null),name:kind==='move'?name:''};
+ busy=true;selection();$('undo').disabled=true;
+ try{const response=await fetch('/history/api/review',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await response.json();if(!response.ok)throw Error(d.error||'保存失敗');selected.clear();$('name').value='';offset=0;$('message').textContent=kind==='undo'?'已撤銷最近一次整理':'已更新 '+d.affected+' 筆到訪，原始分群保留';await load();}
+ catch(e){$('message').textContent=e.message;}finally{busy=false;selection();$('undo').disabled=false;$('prev').disabled=offset===0;$('next').disabled=offset+48>=total;}
+}
+for(const id of ['date','window','excluded'])$(id).onchange=()=>{current='';offset=0;selected.clear();load();};
+$('all').onchange=()=>{for(const r of rows)$('all').checked?selected.add(r.key):selected.delete(r.key);load();};$('reload').onclick=()=>{selected.clear();initial.set('date',$('date').value);initialize();};$('cancel').onclick=()=>{selected.clear();load();};
+$('prev').onclick=()=>{offset=Math.max(0,offset-48);load();};$('next').onclick=()=>{offset+=48;load();};
+for(const id of ['move','restore','undo'])$(id).onclick=()=>change(id);$('closeViewer').onclick=()=>$('viewer').close();
+initialize();
+
+function refreshArchive(){if(document.hidden||busy||$('viewer').open||selected.size)return;load();}
+window.addEventListener('focus',refreshArchive);
+window.addEventListener('storage',e=>{if(e.key==='bird-archive-change')refreshArchive();});
+document.addEventListener('visibilitychange',refreshArchive);
+setInterval(refreshArchive,5000);
+</script><script src="/history/navigation.js"></script></html>

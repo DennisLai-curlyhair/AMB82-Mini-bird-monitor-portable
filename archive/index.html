@@ -1,0 +1,63 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>到訪紀錄</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#091710;color:#e5f2e9;font:16px system-ui,sans-serif}main{max-width:1200px;margin:auto;padding:28px}h1{margin:24px 0 8px;font-size:28px}a{color:#8cf0bc}nav{display:flex;gap:10px;flex-wrap:wrap}nav a{text-decoration:none;padding:10px 16px;border-radius:9px;color:#b9cebf}nav a[aria-current]{background:#234532;color:#a0ffd0}p{line-height:1.6}.muted,small{color:#aac0b0}.row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.filters{margin:24px 0;padding:16px;background:#12271c;border:1px solid #365940;border-radius:12px}label{display:inline-flex;align-items:center;gap:8px}input,button{font:inherit;color:inherit;background:#193826;padding:9px 13px;border:1px solid #52765e;border-radius:7px}button{cursor:pointer}button:disabled{opacity:.4}.cards{display:grid;gap:12px;margin:18px 0}.card{display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:center;padding:16px;background:#12271c;border:1px solid #365940;border-radius:12px}.card img{width:180px;height:130px;object-fit:contain;background:#061109;border-radius:8px}.card h2{font-size:18px;margin:0 0 8px}.card p{margin:6px 0}.missing{width:180px;height:130px;display:grid;place-items:center;background:#061109;color:#aac0b0}.excluded{opacity:.6}#message{color:#ffdc9c}dialog{max-width:94vw;background:#12271c;color:inherit;border:1px solid #52765e;border-radius:12px}dialog::backdrop{background:#000c}dialog img{display:block;max-width:86vw;max-height:75vh;object-fit:contain}dialog .row{justify-content:space-between}@media(max-width:600px){main{padding:16px}.card{grid-template-columns:110px 1fr;gap:14px}.card img,.missing{width:110px;height:110px}}
+</style><main>
+<nav aria-label="主要導覽"><a href="/" target="_blank" rel="noopener">即時監控</a><a href="/history/" aria-current="page">到訪紀錄</a><a href="/history/groups">群組相簿</a></nav>
+<h1>到訪紀錄</h1><p class="muted">查看每次到訪的照片、時間與群組。需要調整分群時，點選該群組。</p>
+<section class="filters row"><label>日期 <input id="date" type="date"></label><label><input id="allDates" type="checkbox">所有日期</label><button id="load">更新</button><span id="summary"></span></section>
+<p id="message" role="status"></p><section id="cards" class="cards"></section>
+<div class="row"><button id="prev">上一頁</button><span id="page"></span><button id="next">下一頁</button></div>
+<dialog id="viewer"><div class="row"><p id="viewTitle"></p><button id="close">關閉</button></div><img id="viewImage" alt="到訪照片"><p class="row"><a id="full" target="_blank" rel="noopener">查看完整畫面</a><small id="photoNote"></small></p></dialog>
+</main><script>
+const $=id=>document.getElementById(id);let offset=0,total=0,requestId=0,busy=false;
+const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const part=k=>parts.find(p=>p.type===k).value;$('date').value=part('year')+'-'+part('month')+'-'+part('day');
+function text(tag,value){const e=document.createElement(tag);e.textContent=value;return e;}
+function groupId(r){return r.manual_group?(r.manual_group.startsWith('auto:')?r.manual_group:'manual:'+r.manual_group):(r.auto_group?'auto:'+r.auto_group:'unassigned');}
+function show(r){$('viewTitle').textContent=r.local_time.slice(0,19).replace('T',' ')+' · 到訪 #'+r.track;$('viewImage').src='/history/images/'+(r.photo?.crop_image||r.image);$('full').hidden=!r.photo;if(r.photo)$('full').href='/history/images/'+r.photo.full_image;$('photoNote').textContent=r.photo?'時間與影像近似配對':'此筆僅有縮圖';$('viewer').showModal();}
+
+function groupingSummary(g){
+ if(!g)return '分群分數：舊紀錄未提供';
+ if(g.score==null){
+  if(g.decision===1)return '首次建立外觀群，無既有群可比對';
+  if(!g.eligible)return '尚未比對：未校時或跨日持續到訪';
+  return '尚未比對：有效樣本 '+g.samples+'/5（樣本不足或無可用影像）';
+ }
+ const gap=g.threshold-g.score;
+ return (g.decision===2?'合併前比對群 ':'當時最接近外觀群 ')+g.candidate+'：'+g.score.toFixed(2)+'% · 當時門檻 '+g.threshold+'% · '+
+  (gap>0?'低於門檻 '+gap.toFixed(2)+' 個百分點':'已達門檻')+
+  (g.decision===1?' · 未合併，建立新群':g.decision===3?' · 群組容量已滿':'');
+}
+
+function deleteVisitButton(r){
+ const button=text('button','刪除這次到訪');button.className='delete-visit';button.type='button';
+ button.onclick=async()=>{
+  if(!confirm('刪除到訪 #'+r.track+'？照片、到訪紀錄及群組關聯將一併移除，次數會重新計算。此操作無法撤銷。'))return;
+  if(busy)return;busy=true;button.disabled=true;
+  try{
+   const response=await fetch('/history/api/delete-visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:r.key})});
+   const data=await response.json();if(!response.ok)throw Error(data.error||'刪除失敗');
+   if($('viewer').open)$('viewer').close();
+   try{localStorage.setItem('bird-archive-change',String(Date.now()));}catch(_){}
+   await load();$('message').textContent='已刪除這次到訪，紀錄及群組次數已更新';
+  }catch(e){$('message').textContent='刪除失敗：'+e.message;button.disabled=false;}finally{busy=false;}
+ };return button;
+}
+
+async function load(){const id=++requestId;try{
+ const query=new URLSearchParams({date:$('allDates').checked?'all':$('date').value,window:'0',offset,limit:48});const response=await fetch('/history/api/visits?'+query);const d=await response.json();if(!response.ok)throw Error(d.error||'無法讀取紀錄');if(id!==requestId)return;
+ total=d.stats.total;if(offset>0&&offset>=total){offset=total?Math.floor((total-1)/48)*48:0;return load();}$('summary').textContent=total+' 次到訪';$('message').textContent=total?'':'這個日期尚無到訪紀錄，可選擇其他日期或所有日期。';
+ $('cards').replaceChildren(...d.visits.map(r=>{const card=document.createElement('article');card.className='card'+(r.excluded?' excluded':'');const name=r.photo?.crop_image||r.image;
+  if(name){const a=document.createElement('a');a.href='/history/images/'+name;a.onclick=e=>{e.preventDefault();show(r);};const im=document.createElement('img');im.src=a.href;im.alt='到訪 #'+r.track;im.loading='lazy';a.append(im);card.append(a);}else{const e=text('div','沒有照片');e.className='missing';card.append(e);}
+  const info=document.createElement('div');info.append(text('h2',r.local_time.slice(0,19).replace('T',' ')),text('p','到訪 #'+r.track+' · 停留 '+(r.duration_ms/1000).toFixed(1)+' 秒'+(r.time_uncertain?' · 時間待確認':'')));
+  const link=document.createElement('a');link.href='/history/groups?'+new URLSearchParams({group:groupId(r),date:r.local_time.slice(0,10)});link.textContent=(r.manual_group?r.group_label:(r.auto_group?'外觀群 '+r.auto_group.split(':').pop():'未分群'))+' →';info.append(link);
+  if(r.excluded)info.append(text('p','已排除'));if(r.photo_deleted)info.append(text('p','照片已刪除'));else if(!r.photo&&r.image)info.append(text('small','僅有縮圖'));info.append(text('p',groupingSummary(r.grouping)));info.append(deleteVisitButton(r));card.append(info);return card;
+ }));$('page').textContent=(total?offset+1:0)+'–'+Math.min(offset+48,total)+' / '+total;$('prev').disabled=offset===0;$('next').disabled=offset+48>=total;
+ }catch(e){if(id===requestId)$('message').textContent=e.message;}}
+for(const name of ['date','allDates'])$(name).onchange=()=>{offset=0;$('date').disabled=$('allDates').checked;load();};$('load').onclick=load;$('prev').onclick=()=>{offset=Math.max(0,offset-48);load();};$('next').onclick=()=>{offset+=48;load();};$('close').onclick=()=>$('viewer').close();load();
+
+function refreshArchive(){if(document.hidden||busy||$('viewer').open)return;load();}
+window.addEventListener('focus',refreshArchive);
+window.addEventListener('storage',e=>{if(e.key==='bird-archive-change')refreshArchive();});
+document.addEventListener('visibilitychange',refreshArchive);
+setInterval(refreshArchive,5000);
+</script><script src="/history/navigation.js"></script></html>
